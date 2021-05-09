@@ -1,0 +1,245 @@
+<HTML>
+<style>
+#info {
+  position: absolute;
+  width: 100vw;
+  text-align: center;
+}
+
+body {
+  overflow: hidden;
+}
+
+
+</style>
+</head>
+<body>
+<div id="info">
+	<button id='toggle' align = 'center'>Switch View</button>
+	<p id='state'> </p>
+</div>
+<script src="https://threejs.org/build/three.min.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+<script src="https://raw.githack.com/mrdoob/three.js/dev/examples/js/misc/Gyroscope.js"></script>
+<script src="model.js"></script>
+<script src="keyframe.js"></script>
+<script>
+javascript:(function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.body.appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='https://mrdoob.github.io/stats.js/build/stats.min.js';document.head.appendChild(script);})()
+
+
+var camera,camera1, scene, renderer,gyro;
+var texture;
+var group;
+var isActive = false;
+
+const WW = 4;
+const HH = 12;
+var head, body, legl, legr,footr,footl;
+var theta = 0;
+var keyboard = new KeyboardState();
+var walk = false;
+var state = 'Stand';
+var intKey;
+var T = 1;
+var clock = new THREE.Clock();
+var ts,theta = 0 ;
+
+
+var keyboard = new KeyboardState();
+var pos = new THREE.Vector3();
+var speed, angle, vel;
+(function() {
+	Math.clamp = function(val,min,max){
+    return Math.min(Math.max(val,min),max);
+}})();
+/////////////////////////////
+
+
+
+$('#toggle').click (
+
+   function() {
+			isActive = ! isActive;  
+			if (!isActive) $('#toggle').text ('using Gyro')
+			else $('#toggle').text ('using camera')
+	}
+);
+
+
+init();
+animate();
+var footl,footr,legr,legl;
+function init() {
+	clock = new THREE.Clock();
+	scene = new THREE.Scene();
+
+	renderer = new THREE.WebGLRenderer({antialias:true});
+	renderer.setSize(window.innerWidth, window.innerHeight);
+	renderer.setClearColor(0x888888);
+	document.body.appendChild(renderer.domElement);
+
+	  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+	  camera.position.z = 500;
+	  let controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+	  camera1 = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+	  camera1.position.set(0,100,500);
+	  let controls1 = new THREE.OrbitControls(camera1, renderer.domElement);
+		
+	  var gridXZ = new THREE.GridHelper(200, 20, 'red', 'white');
+	  scene.add(gridXZ);
+
+	  ////////////////////////////////////////////////////////
+	  var loader = new THREE.TextureLoader();
+		loader.setCrossOrigin('');
+		texture = loader.load ('https://i.imgur.com/IejOuMK.png');
+	  
+		head = buildHead2(12.4,12.4,12.4);
+		head.position.set(0,31,0);
+		
+		footl = foot(6.2,19.1,6.2) ;
+		footl.position.set(3.1,6,0);
+		
+		footr = foot(6.2,19.1,6.2) ;
+		footr.position.set(-3.1,6,0);
+		
+		body = buildBody2(12.4,19.1,6.2);
+		body.position.set (0,15,0);
+		
+		legl=leg2(6.2,19.1,6.2);
+		legl.position.set(9.3,23,0);
+		
+		legr=leg2(6.2,19.1,6.2);
+		legr.position.set(-9.3,23,0);
+		
+		group = new THREE.Group();
+		group.add(head);
+		group.add(footl);
+		group.add(footr);
+		group.add(body);
+		group.add(legl);
+		group.add(legr);
+		
+		scene.add(group);
+		group.position.y = 10;
+		group.rotation.y = Math.PI/2;
+		
+		footl.rotation.x = 0;
+		footr.rotation.x = 0;
+		
+		state = 'Stand';
+		ts = clock.getElapsedTime();
+		speed = 5.0;
+		angle = 0.0;
+			
+		
+		//gyro camera
+		gyro = new THREE.Gyroscope();
+		//scene.add (gyro)
+		group.add (gyro)
+		gyro.add (camera)
+		
+}
+function update(dt) {
+
+	keyboard.update();
+	if ( keyboard.pressed("left") ) 
+		angle += 0.05;               
+	if ( keyboard.pressed("right") )
+		angle -= 0.05;               
+	if ( keyboard.pressed("up") )  
+		speed += 0.6;        
+	if ( keyboard.pressed("down") )  
+		speed -= 0.6;    
+
+	speed = Math.clamp (speed, 0.1, 20.0);		
+	vel = new THREE.Vector3(speed,0,0);
+	
+	vel.applyAxisAngle (new THREE.Vector3(0,1,0), angle);
+	pos.add (vel.clone().multiplyScalar(dt));
+	pos.y = 10;
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function down(event){
+	ts = clock.getElapsedTime();
+	state = 'S2W';
+	let intKey = keyframeS2W(ts,TS2W);
+	
+	footl.rotation.x = intKey[0];
+	footr.rotation.x = intKey[1];
+	
+} 
+
+function animate() {
+	group.position.y = 10;
+	
+	keyboard.update();
+	
+	if(keyboard.down('space')){		//move to walk
+		walk = true;
+		down();		
+	}
+	else if(keyboard.up('space')){	//move to stand
+		walk = false;
+	}
+	
+	if(walk === true){
+		let dt =clock.getDelta();
+		let intKey;
+		switch (state) {
+		case 'Stand':
+			console.log('... in stand');
+			intKey = keyframeStand(clock.getElapsedTime(), TStand);
+			break;
+		case 'S2W':
+			console.log('... in S2W');
+			intKey = keyframeS2W(clock.getElapsedTime(), TS2W);
+			update(dt);
+			break;
+		case 'Walk':
+			console.log('... in walk');
+			intKey = keyframeWalk(clock.getElapsedTime(), TWalk);
+			update(dt);
+			break;
+		}
+		group.position.copy(pos);
+		group.rotation.y = angle+Math.PI/2;
+		footl.rotation.x=intKey[0];
+		footr.rotation.x=intKey[1];
+		legl.rotation.x = intKey[1];
+		legr.rotation.x = intKey[0];
+  
+		
+	}
+	
+	if(walk)
+		$('#state').text('walk');
+	else
+		$('#state').text('stand');
+	
+	
+    if(isActive)
+		renderer.render (scene, camera)
+	else
+		renderer.render (scene, camera1)
+	
+	requestAnimationFrame(animate);
+	render();
+}
+
+function render() {
+  renderer.render(scene, camera);
+}
+</script>
+</body>
+</html>
+
+
